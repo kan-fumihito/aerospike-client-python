@@ -223,8 +223,19 @@ jobs:
       run: M1_PRIVATE_KEY=$(cat "Terraform EC2.pem") >> $GITHUB_ENV
       working-directory: ../devops
 
-    # TODO: wait
-    - name: Wait for mac M1 to be ready to connect to
+    - name: Copy over wheels and test script
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ env.M1_HOST_IP }}
+        username: ec2-user
+        password: ''
+        key: ${{ env.M1_PRIVATE_KEY }}
+        source: "wheelhouse/ .github/workflows/test-m1-wheels.sh"
+        target: "./"
+        # Mac M1 instances take 40 mins to boot up
+        # But we wait for 60 mins to be safe before timing out
+        # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html
+        timeout: "60m"
 
     - name: SSH into mac M1
       uses: appleboy/ssh-action@v0.1.6
@@ -233,7 +244,7 @@ jobs:
         username: "ec2-user"
         password: ""
         key: "${{ env.M1_PRIVATE_KEY }}"
-        script: |
+        script: zsh
 
       working-directory: ../devops
 

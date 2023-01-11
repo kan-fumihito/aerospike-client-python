@@ -3,19 +3,14 @@
 # Show commands being executed
 set -x
 
-# Get Python client source
-git clone --recurse-submodules "https://github.com/aerospike/aerospike-client-python.git"
+# Get Python client tests
+git clone "https://github.com/aerospike/aerospike-client-python.git"
 cd aerospike-client-python/
 
-# Prepare for building wheels
+# Prepare for testing wheels
 brew install python@3.8
 brew install python@3.9
 python3.9 -m pip install delocate
-
-openssl_install_path=$(brew --prefix openssl@1.1)
-export STATIC_SSL=1
-export SSL_LIB_PATH="$openssl_install_path/lib/"
-export CPATH="$openssl_install_path/include/"
 
 # Helper functions
 
@@ -32,16 +27,14 @@ raise_flags() {
     set_tag http://169.254.169.254/latest/meta-data/instance-id
 }
 
-# Build wheels for each python version
+# Test wheels for each python version
+sed -i "s/hosts : 127.0.0.1:3000/hosts : ${{ env.SERVER_IP }}/" config.conf
 python_versions=('3.8' '3.9')
 for version in "${python_versions[@]}"; do
-    python${version} -m pip install build
-    python${version} -m build
-    delocate-wheel --require-archs "arm64" -w wheelhouse/ -v dist/*.whl
-    python${version} -m pip install wheelhouse/*.whl
+    # Install wheel
+    python${version} -m pip install --find-links=wheelhouse/ --no-index aerospike
 
     cd test/
-    sed -i "s/hosts : 127.0.0.1:3000/hosts : ${{ env.SERVER_IP }}/" config.conf
     python${version} -m pip install -r requirements.txt
     python${version} -m pytest new_tests/
 

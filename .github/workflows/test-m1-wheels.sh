@@ -29,7 +29,7 @@ raise_flags() {
 
 # Test wheels for each python version
 sed -i "s/hosts : 127.0.0.1:3000/hosts : ${{ env.SERVER_IP }}/" config.conf
-python_versions=('3.8' '3.9')
+python_versions=('3.8' '3.9' '3.10')
 for version in "${python_versions[@]}"; do
     # Install wheel
     python${version} -m pip install --find-links=wheelhouse/ --no-index aerospike

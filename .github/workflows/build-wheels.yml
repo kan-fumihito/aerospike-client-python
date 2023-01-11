@@ -202,7 +202,6 @@ jobs:
         cd ..
         git clone https://github.com/citrusleaf/devops
 
-    # TODO: setup Terraform
     - name: Install Terraform
       uses: hashicorp/setup-terraform@v2
 
@@ -213,7 +212,7 @@ jobs:
       working-directory: ../devops
 
     - name: Get IP address of Mac M1 instance
-      run: M1_IP=$(terraform output -raw mac-ip-address) >> $GITHUB_ENV
+      run: M1_HOST_IP=$(terraform output -raw mac-ip-address) >> $GITHUB_ENV
       working-directory: ../devops
 
     - name: Get IP address of server
@@ -221,7 +220,7 @@ jobs:
       working-directory: ../devops
 
     - name: Get raw contents of private key
-      run: M1_PK=$(cat "Terraform EC2.pem") >> $GITHUB_ENV
+      run: M1_PRIVATE_KEY=$(cat "Terraform EC2.pem") >> $GITHUB_ENV
       working-directory: ../devops
 
     # TODO: wait
@@ -230,56 +229,11 @@ jobs:
     - name: SSH into mac M1
       uses: appleboy/ssh-action@v0.1.6
       with:
-        host: "${{ env.M1_IP }}"
+        host: "${{ env.M1_HOST_IP }}"
         username: "ec2-user"
         password: ""
-        key: "${{ env.M1_PK }}"
+        key: "${{ env.M1_PRIVATE_KEY }}"
         script: |
-          # Configure aws cli
-          
-
-          function setflag() {
-            host_id=$(curl -w '\n' -s http://169.254.169.254/latest/meta-data/placement/host-id)
-            aws 
-          }
-
-          git clone --recurse-submodules "https://github.com/aerospike/aerospike-client-python.git"
-          cd aerospike-client-python/
-          openssl_install_path=$(brew --prefix openssl@1.1)
-          export STATIC_SSL=1
-          export SSL_LIB_PATH="$openssl_install_path/lib/"
-          export CPATH="$openssl_install_path/include/"
-
-          brew install python@3.8
-          brew install python@3.9
-          python3.9 -m pip install delocate
-
-          python_versions=('3.8' '3.9')
-          for version in "${python_versions[@]}"; do
-            python${version} -m pip install build
-            python${version} -m build
-            delocate-wheel --require-archs "arm64" -w wheelhouse/ -v dist/*.whl
-            python${version} -m pip install wheelhouse/*.whl
-
-            cd test/
-            sed -i "s/hosts : 127.0.0.1:3000/hosts : ${{ env.SERVER_IP }}/" config.conf
-            python${version} -m pip install -r requirements.txt
-            python${version} -m pytest new_tests/
-
-            # Fail this workflow if the tests failed
-            result=$(echo $?)
-            if [[ $result -ne 0 ]]; then
-              # Set flag to destroy this instance and host
-              curl -w '\n' -s http://169.254.169.254/latest/meta-data/instance-id
-
-              exit $result
-            fi
-            cd ..
-          done
-
-          # All wheels passed
-          # Set flag
-            cat instance-id
 
       working-directory: ../devops
 

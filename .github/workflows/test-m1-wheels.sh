@@ -8,6 +8,9 @@ set -e
 # Get Python client tests
 git clone --recurse-submodules "https://github.com/aerospike/aerospike-client-python.git"
 cd aerospike-client-python/
+branchToTest=$2
+git checkout $branchToTest
+git submodule update --recursive
 
 # Prepare for testing wheels
 python3 -m pip install delocate

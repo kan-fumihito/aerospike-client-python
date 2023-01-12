@@ -218,10 +218,21 @@ jobs:
         username: "ec2-user"
         password: ""
         key: "${{ env.M1_PRIVATE_KEY }}"
-        script: zsh test-m1-wheels.sh "${{ env.SERVER_IP }}"
+        script: |
+          currentBranch=$(git branch --show-current)
+          zsh test-m1-wheels.sh "${{ env.SERVER_IP }}" $currentBranch
 
     - name: Download wheels from Mac M1
       run: scp -R -i <(${{ env.M1_PRIVATE_KEY }}) ec2-user@${{ env.M1_HOST_IP }}:aerospike-client-python/wheelhouse/ wheelhouse/
+
+    - name: Set up AWS CLI to flag instance
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        role-to-assume: arn:aws:iam::123456789100:role/my-github-actions-role
+        aws-region: us-west-2
+
+    - name: Flag instance and host for self-destruct
+      run: 
 
     - name: Save macOS wheel
       uses: actions/upload-artifact@v3

@@ -161,42 +161,16 @@ jobs:
         name: ${{ matrix.os }}-x86_64-${{ matrix.python-version[0] }}
         path: wheelhouse/*.whl
 
+  # Build M1 wheels on EC2
   macOS-m1:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [
-          macos-latest,
-        ]
-        # Python versions to build wheels on
-        python: [
-          "cp38",
-          "cp39",
-          "cp310"
-        ]
-
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
       with:
         submodules: recursive
 
-    - name: Build wheel
-      uses: pypa/cibuildwheel@v2.11.2
-      env:
-        CIBW_BUILD: ${{ matrix.python }}-macosx_arm64
-        CIBW_BUILD_FRONTEND: build
-        # Set env variables before building
-        CIBW_BEFORE_ALL_MACOS: >
-          git clone https://github.com/passepartoutvpn/openssl-apple &&
-          cd openssl-apple &&
-          export CONFIG_OPTIONS="no-shared" &&
-          ./build-libssl.sh --version=1.1.1q --targets="macos64-arm64" --macos-sdk=$(xcrun --show-sdk-version) ||
-          cat "./bin/MacOSX$(xcrun --show-sdk-version)-arm64.sdk/build-openssl-1.1.1q.log"
-        CIBW_ENVIRONMENT: SSL_LIB_PATH="$(pwd)/openssl-apple/bin/MacOSX$(xcrun --show-sdk-version)-arm64.sdk/lib/" CPATH="$(pwd)/openssl-apple/bin/MacOSX$(xcrun --show-sdk-version)-arm64.sdk/include/" STATIC_SSL=1
-        CIBW_ARCHS: "arm64"
-
     # TODO: need ssh key
+    # Clone terraform module to parent dir
     - name: Get Terraform config to test M1 wheels
       run: |
         cd ..
@@ -223,33 +197,31 @@ jobs:
       run: M1_PRIVATE_KEY=$(cat "Terraform EC2.pem") >> $GITHUB_ENV
       working-directory: ../devops
 
-    - name: Copy over wheels and test script
+    - name: Copy over test script
       uses: appleboy/scp-action@master
       with:
         host: ${{ env.M1_HOST_IP }}
         username: ec2-user
         password: ''
         key: ${{ env.M1_PRIVATE_KEY }}
-        source: "wheelhouse/ .github/workflows/test-m1-wheels.sh"
+        source: ".github/workflows/test-m1-wheels.sh"
         target: "./"
         # Mac M1 instances take 40 mins to boot up
         # But we wait for 60 mins to be safe before timing out
         # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html
         timeout: "60m"
 
-    - name: SSH into mac M1
+    - name: SSH into Mac M1 to build and test wheels
       uses: appleboy/ssh-action@v0.1.6
       with:
         host: "${{ env.M1_HOST_IP }}"
         username: "ec2-user"
         password: ""
         key: "${{ env.M1_PRIVATE_KEY }}"
-        script: zsh
+        script: zsh test-m1-wheels.sh "${{ env.SERVER_IP }}"
 
-      working-directory: ../devops
-
-
-    # TODO: exit ssh
+    - name: Download wheels from Mac M1
+      run: scp -R -i <(${{ env.M1_PRIVATE_KEY }}) ec2-user@${{ env.M1_HOST_IP }}:aerospike-client-python/wheelhouse/ wheelhouse/
 
     - name: Save macOS wheel
       uses: actions/upload-artifact@v3

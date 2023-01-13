@@ -6,6 +6,7 @@ on:
 
 jobs:
   manylinux_arm64:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -65,6 +66,7 @@ jobs:
         name: manylinux-aarch64-${{ matrix.python }}
 
   manylinux_x86_64:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -119,6 +121,7 @@ jobs:
         name: manylinux-x86_64-${{ matrix.python[0] }}
 
   macOS-x86:
+    if: ${{ false }}
     strategy:
       fail-fast: false
       matrix:
@@ -175,6 +178,7 @@ jobs:
       run: |
         cd ..
         git clone https://github.com/citrusleaf/devops
+        exit 1
 
     - name: Install Terraform
       uses: hashicorp/setup-terraform@v2
@@ -225,6 +229,7 @@ jobs:
     - name: Download wheels from Mac M1
       run: scp -R -i <(${{ env.M1_PRIVATE_KEY }}) ec2-user@${{ env.M1_HOST_IP }}:aerospike-client-python/wheelhouse/ wheelhouse/
 
+    # TODO
     - name: Set up AWS CLI to flag instance
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -232,7 +237,13 @@ jobs:
         aws-region: us-west-2
 
     - name: Flag instance and host for self-destruct
-      run: 
+      run: |
+        # Get instance and host ids
+        instanceId=$(terraform show -json | jq '.values.root_module.resources[] | select(.name == "mac-m1-instance").values.id')
+        hostId=$(terraform show -json | jq '.values.root_module.resources[] | select(.name == "mac-m1-host").values.id')
+        # Set tags
+        aws ec2 create-tags --resources "$instanceId" --tags Key=destroy,Value=""
+        aws ec2 create-tags --resources "$hostId" --tags Key=destroy,Value=""
 
     - name: Save macOS wheel
       uses: actions/upload-artifact@v3
